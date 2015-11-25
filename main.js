@@ -17,7 +17,7 @@ app.get('/scrapeAlternate', function scrapeAlternate(req, res){
 	var tabLinks = [];
 //	vlog.vlog("tabLinks inicializado <",tabLinks,">");
 	request({headers:chromeHeaders ,uri:url, saludo:"hola!!", callBack:printLink}, getTabLinks);
-//	vlog.vlog("tabLinks fuera del método<",tabLinks,">");
+	vlog.vlog("tabLinks fuera del método<",tabLinks,">");
 	
 //	var navLinks = [];
 //	vlog.vlog("navlinks declarado <",navLinks,">");
