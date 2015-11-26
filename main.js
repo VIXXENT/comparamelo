@@ -14,10 +14,9 @@ var chromeHeaders = {
 app.get('/scrapeAlternate', function scrapeAlternate(req, res){
 	var url = 'https://www.alternate.es';
 	
-	var tabLinks = [];
 //	vlog.vlog("tabLinks inicializado <",tabLinks,">");
-	request({headers:chromeHeaders ,uri:url, saludo:"hola!!", callBack:printLink}, getTabLinks);
-	vlog.vlog("tabLinks fuera del método<",tabLinks,">");
+	request({headers:chromeHeaders ,uri:url, _callBack:printLink}, getTabLinks);
+//	vlog.vlog("tabLinks fuera del método<",tabLinks,">");
 	
 //	var navLinks = [];
 //	vlog.vlog("navlinks declarado <",navLinks,">");
@@ -41,11 +40,16 @@ app.get('/scrapeAlternate', function scrapeAlternate(req, res){
 
 function printLink(link){
 	//vlog.vlog("TODOS LOS ENLACES:");
-	console.log(JSON.stringify(link));
+	vlog.vlog  ("#############################");
+	console.log("#                           #");
+	console.log(JSON.stringify(link, null, 2));
+	console.log("#                           #");
+	console.log("#############################");
+	console.log("");
 }
 
 function getTabLinks (err, resp, html) {
-	vlog.vlog("saludo: "+this.saludo);
+	checkErrors(err, resp, html, this.uri);
 	//vlog.vlog("scrapeando");
 	//vlog.vlog("ERROR: ",err);
 	//vlog.vlog("res: ",resp.statusCode);
@@ -53,36 +57,83 @@ function getTabLinks (err, resp, html) {
 	mainUrl = mainUrl.slice(0, -1);
 	var $ = cheerio.load(html);
 
-
-	$(".tab").each(function eachTab(ind, tab){
-		var href = $(tab).attr("href");
+	var callBack = this._callBack;
+	
+	//este objeto contendrá todos los links del navTree y una propiedad con 
+	//el número total de links para saber cuándo ha terminado el proceso,
+	//pues el bucle mandará peticiones request para cada uno y cuando acabe 
+	//las mandará a impimir por consola
+	var tabLinks = {linksPendientes:$(".tab").length, mainUrl:mainUrl, tabs:{}};
+	$(".tab").each(function eachTabLink(ind, tab){//Recorre los links de la barra superior: "tabLinks"
+		var href		= $(tab).attr("href");
+		var tabLinkName	= $(tab).text();
 		if(href !== undefined){
-			//tabLinks.push(mainUrl+href);
-			
-			//useTabLinksCallBack (recoger del this)
-			this.callBack(mainUrl+href);
+			//tabLinks.linksPendientes++; //cuento un tabLink pendiente de visitar (cuando termine la request se descontará)
+			if(tabLinks.tabs[tabLinkName] === undefined){
+				tabLinks.tabs[tabLinkName] = {};
+			}
+			tabLinks.tabs[tabLinkName].tabUrl = mainUrl+href; // informo la URL a la que enlaza esta tab
+			requestArguments = {
+				headers		 : chromeHeaders,
+				uri			 : tabLinks.tabs[tabLinkName].tabUrl,
+				_tabLinks	 : tabLinks,
+				_callBack	 : callBack,
+				_tabLinkName : tabLinkName
+			};
+			//vlog.vlog("mandando llamada a getNavLinks, URL = <",requestArguments.uri,">");
+			request(requestArguments, getNavLinks);
+		}else{
+			tabLinks.linksPendientes--;
 		}
 	});
-	//vlog.vlog("tabLinks links insertados <",tabLinks,">");
-	//return tabLinks;
 };
 
 function getNavLinks (err, resp, html) {
-	if(err){
-		vlog.vlog("[ERROR] - ",err);
-	}else{
-		var $ = cheerio.load(html);
-		$("#navTree").find("a").each(function eachNavLink(ind, navLink){
-			var href = $(navLink).attr("href");
-			if(href !== undefined){
-				navLinks.push(mainUrl+href);
-			}
-		});
-		vlog.vlog("Links añadidos a navlinks <",navLinks,">");
-		return navLinks;
-	}
+	checkErrors(err, resp, html, this.uri);
+	var callBack	= this._callBack;//función a la que debemos mandar los resultados de esta función
+	var tabLinks	= this._tabLinks;//objeto con todos los links recogidos hasta el momento
+	var tabLinkName	= this._tabLinkName;//nombre o key del kink en concreto que estamos visitando/procesando (en esta instancia/hilo de la función)
+	var mainUrl		= tabLinks.mainUrl;//url principal de la página que estamos visitando, a la que uniremos los hrefs para montar enlaces completos
+	
+	tabLinks.linksPendientes--;//al lanzarse este método, se ha completado la llamada a un link de tab: descontamos uno al contador.
+	
+	//vlog.vlog("html: "+html);
+	var $ = cheerio.load(html);
+	
+	//vlog.vlog("tabLinks = <",tabLinks,">");
+	tabLinks.tabs[tabLinkName] = {linksPendientes:$("#navTree").find("a").length ,navs:{}};
+	
+	$("#navTree").find("a").each(function eachNavLink(ind, navLink){//Recorre los links del navTree (panel lateral izquierdo): "navLinks"
+		//tabLinks.tabs[tabLinkName].linksPendientes++;//cuento un navLink pendiente de visitar (cuando termine la request se descontará)
+		var href		= $(navLink).attr("href");
+		var navlinkName	= $(navLink).text();
+		if(href !== undefined){
+			tabLinks.tabs[tabLinkName].navs[navlinkName] = {};
+			tabLinks.tabs[tabLinkName].navs[navlinkName].navUrl = mainUrl+href;
+			tabLinks.tabs[tabLinkName].linksPendientes--;
+		}else{
+			tabLinks.tabs[tabLinkName].linksPendientes--;
+		}
+		if(tabLinks.tabs[tabLinkName].linksPendientes === 0 && tabLinks.linksPendientes === 0){
+			callBack(tabLinks);
+		}else{
+			console.log("<",tabLinks.linksPendientes,"><",tabLinks.tabs[tabLinkName].linksPendientes,">");
+		}
+	});
 }
 
+function checkErrors(err, resp, html, uri){
+	/*if(err){
+		vlog.vlog("[DEBUG] -- ");
+		vlog.vlog("[DEBUG] -- ");
+		vlog.vlog("[DEBUG] -- URL = <",uri,">");
+		vlog.vlog("[DEBUG] -- err = <",err,">");
+		vlog.vlog("[DEBUG] -- html = <",html,">");
+		vlog.vlog("[DEBUG] -- resp = <",resp,">");
+		vlog.vlog("[DEBUG] -- ");
+		vlog.vlog("[DEBUG] -- ");
+	}*/
+}
 
-console.log("Listo y escuchando");
+vlog.vlog("Listo y escuchando");
 app.listen('80');
