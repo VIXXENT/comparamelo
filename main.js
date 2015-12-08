@@ -12,19 +12,33 @@ var chromeHeaders = {
 };
 
 app.get('/scrapeAlternate', function scrapeAlternate(req, res){
-	var url = 'https://www.alternate.es/';
-	getLinks(url);
+	var url = 'https://www.alternate.es';
+	getLinks(url, res);
 	//request({headers:chromeHeaders ,uri:url, _callBack:printLink}, getTabLinks);
 });
 
 function lanzaRequest(requestArgs, url, callBack) {
+	var retries = 0;
+	if(requestArgs!==undefined && requestArgs.bkpRequest !==undefined && requestArgs.bkpRequest.retries!==undefined ){
+		retries = requestArgs.bkpRequest.retries;
+	}
+	
+	var encodedUri = encodeURI(url);
+	
 	var requestArguments = {
 		headers : {
-			"host":"www.alternate.es",
-			"accept":"text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
-			"user-agent":"Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/44.0.2403.107 Safari/537.36"
+			"host"			: "www.alternate.es",
+			"accept"		: "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+			"user-agent"	: "Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/44.0.2403.107 Safari/537.36"
 		},
-		uri: url
+		uri					: encodedUri,
+		_url				: url,
+		_bkpRequest:{
+			requestArgs	:requestArgs,
+			url			:encodedUri,
+			callBack	:callBack,
+			retries		:retries
+		}
 	};
 	
 	for(var key in requestArgs){
@@ -34,42 +48,79 @@ function lanzaRequest(requestArgs, url, callBack) {
 	request(requestArguments, callBack);
 };
 
-function getLinks(url){
+function getLinks(url, res){
 	vlog.vlog();
 	var aLinks = {
 		mainUrl			: url,
-		linksPendientes	: 1
+		linksPendientes	: 1,
+		links			: {}
 	};
 	var requestArgs = {
 		_callBack	: printLink,
-		_root		: aLinks
+		_root		: aLinks,
+		_thisLevel	: aLinks.links,
+		_response	: res
 	};
 	lanzaRequest(requestArgs, url, extract);
 }
 
 function getAnchors(parentPath, $){
-	vlog.vlog();
-	var anchors;
-	if(parentPath===undefined || parentPath===null || parentPath===''){
-		anchors = $("#tabberTab .tab");
+	console.log("Obteniendo sub-enlaces de <",parentPath,">");
+	var anchors = undefined;
+	var childrenselector = undefined;
+	if(parentPath===undefined || parentPath===null || parentPath==='/' || parentPath===''){
+		var childrenselector = ".nav_tab_main a";
+		anchors = $(childrenselector);
 	}else{
-		anchors = $("#navTree [href='"+parentPath+"']").closest("ul").find("a[href!='"+parentPath+"']");
+		//Comprobación, por si aparece la pantalla de bienvenida/index en lugar de la página que debería aparecer
+		//En caso de que no exista el panel .tree dentro de #navTree, entendemos que algo ha ido mal y saltamos el link
+		if($("#navTree .tree").length<=0){
+			//retornamos un array vacío para que la lógica siga con normalidad, como si este enlace no tuviera sub-enlaces
+			//un array vacío normal "[]" no tiene "each", así que mandamos el array jQuery que sabemos que está vacío
+			//y que tenemos a mano, el de la comprobación.
+			return $("#navTree .tree");
+		}
+		
+		var anchor				= $("#navTree [href='"+parentPath+"']");
+		var level				= anchor.closest('li').attr('class').match(/(subLevel[^\s]*|parent)/)[0];
+		childrenselector = '.subLevel';
+		if(level === 'parent'){
+			//La etiqueta actual es de clase "parent", sus hijos tendrán la clase "subLevel" (sin número)
+			childrenselector += 2;
+		}else{
+			//La etiqueta actual es "subLevel" (con o sin número), sus hijos podrán ser de subLevel2 en adelante (subLevbel3...)
+			var subLevel		= level.match(/subLevel[^\s]*/)[0];
+			var subLevelNums	= subLevel.match(/[0-9]+/);
+			
+			
+			if (subLevelNums !== null && subLevelNums.length>0){
+				var subLevelNum	= subLevel.match(/[0-9]+/);
+				var nextSubLevel = parseInt(subLevelNum)+1;
+				childrenselector += nextSubLevel;
+			}else{
+				childrenselector += 2;
+			}
+		}
+		
+		var parentUl			= anchor.closest("ul");
+		
+		anchors = parentUl.find(childrenselector+" a");
 	}
 	return anchors;
 }
 
 function extract(err, resp, html){
-	vlog.vlog();
-	var parentUrl	= this.uri.href;
+	var parentUrl	= this._url;
 	var root		= this._root;
 	var thisLevel	= this._thisLevel;
 	var callBack	= this._callBack;
+	var response	= this._response;
 	if(thisLevel === undefined){
 		thisLevel = root;
 	}
-	console.log("checkErrors retorna <",checkErrors(err, resp, html, this),">");
+	
 	if(checkErrors(err, resp, html, this)===200){
-		var $			= cheerio.load(html);
+		var $ = cheerio.load(html);
 		
 		//Descuento el enlace que ha ido bien.
 		root.linksPendientes --;
@@ -77,44 +128,50 @@ function extract(err, resp, html){
 		var parentPath = parentUrl.replace(root.mainUrl,'');
 		var anchors = getAnchors(parentPath, $);
 		root.linksPendientes += anchors.length;
-		vlog.vlog("anchors.length = <",anchors.length,">");
+		//console.log("<",anchors.length,">++ - ",parentUrl);
 		anchors.each(function eachAnchor(ind, anchor){
 			var anchorHref	= $(anchor).attr("href");
 			var anchorText	= $(anchor).text();
 			var fullUrl	= root.mainUrl + anchorHref;
-			thisLevel[anchorText] = {url:anchorHref, links:{}};
 
 			var requestArgs = {
 				_callBack	: callBack,
 				_root		: root,
-				_thisLevel	: thisLevel[anchorText].links
+				_response	: response
 			};
 
-			if($(anchor).hasClass("hasSubs") || $(anchor).hasClass("tab")){
+			thisLevel[anchorText] = {url:anchorHref};
+			
+			if($(anchor).closest("li").hasClass("hasSubs") || $(anchor).parent().hasClass("nav_tab_main")){
 				//Este enlace tiene enlaces hijos
+				//vlog.vlog("Este enlace <",parentUrl,"> --> <",anchorText,"> tiene enlaces hijos");
+				thisLevel[anchorText].links = {};
+				requestArgs._thisLevel = thisLevel[anchorText].links;
+				
 				lanzaRequest(requestArgs, fullUrl, extract);
 			}else{
 				//este enlace no tiene enlaces hijos
+				//vlog.vlog("Este enlace <",parentUrl,"> --> <",anchorText,"> NO tiene enlaces hijos");
 				lanzaRequest(requestArgs, fullUrl, getItemsList);
 			}
 		});
 	}
-	
-	
-
 }
 
 function getItemsList(err, resp, html){
-	vlog.vlog();
-	//var parentUrl	= this.uri.href;
+	//vlog.vlog();
+	//var parentUrl	= this._url;
 	var root		= this._root;
 	var callBack	= this._callBack;
+	var response	= this._response;
 	//var $			= cheerio.load(html);
 	
+	root.linksPendientes --;
+	
 	if(root.linksPendientes === 0){
-		callBack(root);
+		callBack(root, response);
 	}else{
-		vlog.vlog("Not yet<"+root.linksPendientes+">");
+		console.log("quedan <"+root.linksPendientes+"> enlaces por visitar");
 	}
 }
 
@@ -125,22 +182,52 @@ function checkErrors(err, resp, html, callerContext){
 	}
 	
 	if(err!==null){
-		vlog.vlog("ERROR -- ",err);
+		console.log("ERROR -- ",err, " - "+callerContext._url);
+		relanzaRequest(callerContext);
 		returnCode = 500;
 	}else if(resp.statusCode !== 200){
-		vlog.vlog("ERROR -- ", resp.statusCode);
+		console.log("ERROR -- ", resp.statusCode, " - "+callerContext._url);
+		relanzaRequest(callerContext);
 		returnCode = resp.statusCode;
-	}else if(cheerio.load("#missingPageForm").length>0){
-		vlog.vlog("WARNING: la página con URL<",callerContext.uri.href,"> ha devuelto error de no disponible");
-		
-		//al llamar desde aquí, no se mandan los mismos atributos a request
-		//hay que reconstruir la cabecera y utilizar el caller como callback para un nuevo reuqest()
-		//para bien habrá que mandarlo tal cual se había mandado antes (cabecera, argumentos, requestArgs...)
-		var caller = arguments.callee.caller;
-		request(callerContext, caller);
+	}else if(cheerio.load(html)("#missingPageForm").length>0){
+		console.log("WARNING: la página con URL<",callerContext._url,"> ha devuelto error de no disponible");
+		console.log("\n\n\n\n\n");
+		console.log(html);
+		console.log("\n\n\n\n\n");
+		relanzaRequest(callerContext);
 		returnCode = 429;
 	}
 	return returnCode;
+}
+
+function relanzaRequest(callerContext){
+	//relanzamiento de la request desde el backup
+	var bkpRequest	= callerContext._bkpRequest;
+	var root		= callerContext._root;
+	var requestArgs	= bkpRequest.requestArgs;
+	var url			= bkpRequest.url;
+	var callBack	= bkpRequest.callBack;
+	var maxRetries	= 15;
+	
+	bkpRequest.retries++;
+	var retries		= bkpRequest.retries;
+
+	if(retries<=maxRetries){
+		vlog.vlog("reintentando <",url,"> por <",retries,">ª vez");
+		requestArgs._bkpRequest = bkpRequest;
+		lanzaRequest(requestArgs, url, callBack);
+	}else{
+		console.log("\n");
+		vlog.vlog  ("/!\\ /!\\ /!\\ /!\\ /!\\ /!\\ /!\\ /!\\ /!\\ /!\\ /!\\ /!\\ /!\\ /!\\ /!\\ /!\\ /!\\ /!\\ /!\\ /!\\ /!\\ /!\\ /!\\ /!\\");
+		console.log("/!\\ /!\\ /!\\ /!\\ /!\\ /!\\ /!\\ /!\\ /!\\ /!\\ /!\\ /!\\ /!\\ /!\\ /!\\ /!\\ /!\\ /!\\ /!\\ /!\\ /!\\ /!\\ /!\\ /!\\");
+		console.log("[WARNING] - La URL <",url,"> ha provocado errores más de <",maxRetries,"> veces <",retries,">, y por tanto se va a saltar");
+		console.log("/!\\ /!\\ /!\\ /!\\ /!\\ /!\\ /!\\ /!\\ /!\\ /!\\ /!\\ /!\\ /!\\ /!\\ /!\\ /!\\ /!\\ /!\\ /!\\ /!\\ /!\\ /!\\ /!\\ /!\\");
+		console.log("/!\\ /!\\ /!\\ /!\\ /!\\ /!\\ /!\\ /!\\ /!\\ /!\\ /!\\ /!\\ /!\\ /!\\ /!\\ /!\\ /!\\ /!\\ /!\\ /!\\ /!\\ /!\\ /!\\ /!\\");
+		console.log("\n");
+		
+		//Descuento el enlace que ha pasado el límite de reintentos.
+		root.linksPendientes --;
+	}
 }
 
 //function checkLinksPendientes(tabLinks){
@@ -157,7 +244,7 @@ function checkErrors(err, resp, html, callerContext){
 //	}
 //}
 
-function printLink(link){
+function printLink(link, response){
 	//vlog.vlog("TODOS LOS ENLACES:");
 	vlog.vlog  ("#############################");
 	console.log("#                           #");
@@ -165,6 +252,7 @@ function printLink(link){
 	console.log("#                           #");
 	console.log("#############################");
 	console.log("");
+	response.send("<pre>"+JSON.stringify(link, null, 2)+"</pre>");
 }
 
 //function getTabLinks (err, resp, html) {
@@ -207,7 +295,7 @@ function printLink(link){
 //			}
 //		});
 //	}else{
-//		vlog.vlog("WARNING: saltando página <",this.uri.href,">");
+//		vlog.vlog("WARNING: saltando página <",this._url,">");
 //		
 //	}
 //};
@@ -258,8 +346,8 @@ function printLink(link){
 //			}
 //		});
 //	}else{
-//		vlog.vlog("WARNING: saltando página <",this.uri.href,">");
-//		vlog.vlog("       : linksPendientes <",this.uri.href,"> = <"+this._tabLinks.linksPendientes[this._parentObj.url]+">");
+//		vlog.vlog("WARNING: saltando página <",this._url,">");
+//		vlog.vlog("       : linksPendientes <",this._url,"> = <"+this._tabLinks.linksPendientes[this._parentObj.url]+">");
 //		
 //	}
 //}
@@ -331,8 +419,8 @@ function printLink(link){
 //		//	Si no tiene hijos, llamaremos a un método que recoja la lista completa ("todos") de artículos de este enlace ("getItemLinks")
 //
 //	}else{
-//		vlog.vlog("WARNING: saltando página <",this.uri.href,">");
-//		vlog.vlog("       : linksPendientes <",this.uri.href,"> = <"+this._tabLinks.linksPendientes[this._parentObj.url]+">");
+//		vlog.vlog("WARNING: saltando página <",this._url,">");
+//		vlog.vlog("       : linksPendientes <",this._url,"> = <"+this._tabLinks.linksPendientes[this._parentObj.url]+">");
 //	}
 //}
 
@@ -373,8 +461,8 @@ function printLink(link){
 //			console.log(lineaTotalLinksPendientes);
 //		}
 //	}else{
-//		vlog.vlog("WARNING: saltando página <",this.uri.href,">");
-//		vlog.vlog("       : linksPendientes <",this.uri.href,"> = <"+this._tabLinks.linksPendientes[this._parentObj.url]+">");
+//		vlog.vlog("WARNING: saltando página <",this._url,">");
+//		vlog.vlog("       : linksPendientes <",this._url,"> = <"+this._tabLinks.linksPendientes[this._parentObj.url]+">");
 //	}
 //}
 
@@ -382,7 +470,7 @@ function printLink(link){
 //	
 //	$ = cheerio.load(html);
 //	if($("#missingPageForm").length>0){
-//		vlog.vlog("WARNING: la página con URL<",callerContext.uri.href,"> ha devuelto error de no disponible");
+//		vlog.vlog("WARNING: la página con URL<",callerContext._url,"> ha devuelto error de no disponible");
 //		
 //		//al llamar desde aquí, no se mandan los mismos atributos a request
 //		//hay que reconstruir la cabecera y utilizar el caller como callback para un nuevo reuqest()
