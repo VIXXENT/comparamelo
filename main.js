@@ -12,12 +12,12 @@ var chromeHeaders = {
 };
 
 app.get('/scrapeAlternate', function scrapeAlternate(req, res){
-	var url = 'https://www.alternate.es';
+	var url = 'https://www.alternate.es/';
 	getLinks(url);
 	//request({headers:chromeHeaders ,uri:url, _callBack:printLink}, getTabLinks);
 });
 
-function lanzaRequest(requestArgs, url, callback) {
+function lanzaRequest(requestArgs, url, callBack) {
 	var requestArguments = {
 		headers : {
 			"host":"www.alternate.es",
@@ -31,12 +31,15 @@ function lanzaRequest(requestArgs, url, callback) {
 		requestArguments[key] = requestArgs[key];
 	}
 	
-	request(requestArguments, callback);
+	request(requestArguments, callBack);
 };
 
 function getLinks(url){
 	vlog.vlog();
-	var aLinks = {};
+	var aLinks = {
+		mainUrl			: url,
+		linksPendientes	: 1
+	};
 	var requestArgs = {
 		_callBack	: printLink,
 		_root		: aLinks
@@ -44,13 +47,13 @@ function getLinks(url){
 	lanzaRequest(requestArgs, url, extract);
 }
 
-function getAnchors(parentUrl, $){
+function getAnchors(parentPath, $){
 	vlog.vlog();
 	var anchors;
-	if(!parentUrl){
+	if(parentPath===undefined || parentPath===null || parentPath===''){
 		anchors = $("#tabberTab .tab");
 	}else{
-		anchors = $("#navTree [href='"+parentUrl+"']").closest("ul").find("a[href!='"+parentUrl+"']");
+		anchors = $("#navTree [href='"+parentPath+"']").closest("ul").find("a[href!='"+parentPath+"']");
 	}
 	return anchors;
 }
@@ -61,35 +64,38 @@ function extract(err, resp, html){
 	var root		= this._root;
 	var thisLevel	= this._thisLevel;
 	var callBack	= this._callBack;
-	var $			= cheerio.load(html);
 	if(thisLevel === undefined){
 		thisLevel = root;
 	}
-	
-	if(checkErrors()===200){
+	console.log("checkErrors retorna <",checkErrors(err, resp, html, this),">");
+	if(checkErrors(err, resp, html, this)===200){
+		var $			= cheerio.load(html);
+		
 		//Descuento el enlace que ha ido bien.
 		root.linksPendientes --;
 		
-		var anchors = getAnchors(parentUrl, $);
+		var parentPath = parentUrl.replace(root.mainUrl,'');
+		var anchors = getAnchors(parentPath, $);
 		root.linksPendientes += anchors.length;
-
+		vlog.vlog("anchors.length = <",anchors.length,">");
 		anchors.each(function eachAnchor(ind, anchor){
 			var anchorHref	= $(anchor).attr("href");
 			var anchorText	= $(anchor).text();
+			var fullUrl	= root.mainUrl + anchorHref;
 			thisLevel[anchorText] = {url:anchorHref, links:{}};
 
 			var requestArgs = {
-				_callback	: callBack,
+				_callBack	: callBack,
 				_root		: root,
 				_thisLevel	: thisLevel[anchorText].links
 			};
 
 			if($(anchor).hasClass("hasSubs") || $(anchor).hasClass("tab")){
 				//Este enlace tiene enlaces hijos
-				lanzaRequest(requestArgs, anchorHref, extract);
+				lanzaRequest(requestArgs, fullUrl, extract);
 			}else{
 				//este enlace no tiene enlaces hijos
-				lanzaRequest(requestArgs, anchorHref, getItemsList);
+				lanzaRequest(requestArgs, fullUrl, getItemsList);
 			}
 		});
 	}
@@ -113,9 +119,18 @@ function getItemsList(err, resp, html){
 }
 
 function checkErrors(err, resp, html, callerContext){
-	vlog.vlog();
-	$ = cheerio.load(html);
-	if($("#missingPageForm").length>0){
+	var returnCode = undefined;
+	if(resp && resp.statusCode){
+		returnCode = resp.statusCode;
+	}
+	
+	if(err!==null){
+		vlog.vlog("ERROR -- ",err);
+		returnCode = 500;
+	}else if(resp.statusCode !== 200){
+		vlog.vlog("ERROR -- ", resp.statusCode);
+		returnCode = resp.statusCode;
+	}else if(cheerio.load("#missingPageForm").length>0){
 		vlog.vlog("WARNING: la página con URL<",callerContext.uri.href,"> ha devuelto error de no disponible");
 		
 		//al llamar desde aquí, no se mandan los mismos atributos a request
@@ -123,10 +138,9 @@ function checkErrors(err, resp, html, callerContext){
 		//para bien habrá que mandarlo tal cual se había mandado antes (cabecera, argumentos, requestArgs...)
 		var caller = arguments.callee.caller;
 		request(callerContext, caller);
-		return 500;
-	}else{
-		return 200;
+		returnCode = 429;
 	}
+	return returnCode;
 }
 
 //function checkLinksPendientes(tabLinks){
