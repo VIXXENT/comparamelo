@@ -71,7 +71,7 @@ function extract(err, resp, html){
 	if(thisLevel === undefined){
 		thisLevel = root;
 	}
-	
+	//cambio
 	if(checkErrors(err, resp, html, this)===200){
 		var $ = cheerio.load(html);
 		
