@@ -65,7 +65,7 @@ function paginate(err, resp, html){
 				};
 				requesting.lanzaRequest(requestArgs, root.mainUrl+anchor.attribs.href, getItemInfo);
 		});
-	}
+	}else{vlog.vlog("HA HABIDO UN ERROR");}
 }
 
 function getItemInfo(err, resp, html){
@@ -99,7 +99,7 @@ function getItemInfo(err, resp, html){
 		}else{
 			console.log("quedan <",linksCollection.linksPendientes,"> enlaces por visitar");
 		}
-	}
+	}else{vlog.vlog("HA HABIDO UN ERROR");}
 }
 
 function getAnchors($){

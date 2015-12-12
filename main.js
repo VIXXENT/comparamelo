@@ -17,19 +17,27 @@ app.get('/scrapeAlternate', function scrapeAlternate(req, res){
 	var url = 'https://www.alternate.es';
 	alternateLinks.getLinks(url, res, printLink);
 });
+app.get('/scrapeAlternateSelecting', function scrapeAlternate(req, res){
+	var url = 'https://www.alternate.es';
+	var getLinksOptions = {elementsToInspect : [
+		"Hardware",
+		"Memoria RAM",
+		"DDR3",
+		"DDR3-1800"
+	]};
+	alternateLinks.getLinks(url, res, printLink, getLinksOptions);
+});
 
 app.get('/scrapeAlternateItemsList', function scrapeAlternate(req, res){
 	var url = 'https://www.alternate.es/Hardware/Componentes/Memoria-RAM/DDR3/DDR3-1800';
 	alternateItems.getItemsList(url, res, printLink);
 });
 
-
-
 app.get('/scrapeAlternateAllItemsLists', function scrapeAlternateAllItemsLists(req, res){
-		var url = 'https://www.alternate.es';
-		//alternateLinks.getLinks(url, res, printLinksCollection);
-		var navLinks		= require('./modules/dummies/alternateNavigationLinksDummy').navigationLinksShorter;
-		printLinksCollection(navLinks, res);
+	var getLinksOptions = {elementsToInspect : [
+		"/Hardware/Componentes/Discos-duros"
+	]};
+	alternateLinks.getLinks('https://www.alternate.es', res, printLinksCollection, getLinksOptions);
 });
 
 function printLinksCollection(linksCollection, response, thisLevel){

@@ -10,15 +10,24 @@ var chromeHeaders = {
 	"user-agent":"Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/44.0.2403.107 Safari/537.36"
 };
 
-function lanzaRequest(requestArgs, url, callBack) {
+function lanzaRequest(requestArgs, url, callBack, options) {
 	var retries = 0;
 	if(requestArgs!==undefined && requestArgs.bkpRequest !==undefined && requestArgs.bkpRequest.retries!==undefined ){
 		retries = requestArgs.bkpRequest.retries;
 	}
 	
+	if(options === undefined){
+		options = {};
+	}
+	
+	if(options.maxSockets === undefined){
+		options.maxSockets = 25;
+	}
+	
 	var encodedUri = encodeURI(url);
 	
 	var requestArguments = {
+		pool: { maxSockets: options.maxSockets },
 		headers : {
 			"host"			: "www.alternate.es",
 			"accept"		: "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",

@@ -7,7 +7,13 @@ var cheerio			= require('cheerio');
 var requesting		= require('../utils/requesting');
 // -- }
 
-function getLinks(url, res, callBack){
+function getLinks(url, res, callBack, options){
+	//options es un argumento opcional, si no se informa lo convertimos en obeto vacío ({})
+	//para que al buscar sus propiedades, no provoque errores
+	if(options === undefined){
+		options = {};
+	}
+	
 	vlog.vlog();
 	var aLinks = {
 		mainUrl			: url,
@@ -18,7 +24,8 @@ function getLinks(url, res, callBack){
 		_callBack	: callBack,
 		_root		: aLinks,
 		_thisLevel	: aLinks.links,
-		_response	: res
+		_response	: res,
+		_options	: options
 	};
 	requesting.lanzaRequest(requestArgs, url, extract);
 }
@@ -29,6 +36,8 @@ function extract(err, resp, html){
 	var thisLevel	= this._thisLevel;
 	var callBack	= this._callBack;
 	var response	= this._response;
+	var options		= this._options;
+	
 	if(thisLevel === undefined){
 		thisLevel = root;
 	}
@@ -47,27 +56,43 @@ function extract(err, resp, html){
 			var anchorHref	= $(anchor).attr("href");
 			var anchorText	= $(anchor).text();
 			var fullUrl	= root.mainUrl + anchorHref;
-
-			var requestArgs = {
-				_callBack	: callBack,
-				_root		: root,
-				_response	: response
-			};
-
-			thisLevel[anchorText] = {url:anchorHref};
 			
-			if($(anchor).closest("li").hasClass("hasSubs") || $(anchor).parent().hasClass("nav_tab_main")){
-				//Este enlace tiene enlaces hijos
-				//vlog.vlog("Este enlace <",parentUrl,"> --> <",anchorText,"> tiene enlaces hijos");
-				thisLevel[anchorText].links = {};
-				requestArgs._thisLevel = thisLevel[anchorText].links;
-				
-				requesting.lanzaRequest(requestArgs, fullUrl, extract);
+			var anchorHrefMatchesElementsToInspect = false;
+			if(options.elementsToInspect!==undefined){
+				options.elementsToInspect.forEach(function(elementToInspect){
+					if(anchorHref.indexOf(elementToInspect)>=0 || elementToInspect.indexOf(anchorHref)>=0){
+						anchorHrefMatchesElementsToInspect = true;
+						return false;//break
+					}
+				});
+			}
+			
+			if(options.elementsToInspect === undefined || (options.elementsToInspect.indexOf(anchorText)>=0) || (anchorHrefMatchesElementsToInspect)){
+				var requestArgs = {
+					_callBack	: callBack,
+					_root		: root,
+					_response	: response,
+					_options	: options
+				};
+
+				thisLevel[anchorText] = {url:anchorHref};
+
+				if($(anchor).closest("li").hasClass("hasSubs") || $(anchor).parent().hasClass("nav_tab_main")){
+					//Este enlace tiene enlaces hijos
+					//vlog.vlog("Este enlace <",parentUrl,"> --> <",anchorText,"> tiene enlaces hijos");
+					thisLevel[anchorText].links = {};
+					requestArgs._thisLevel = thisLevel[anchorText].links;
+
+					requesting.lanzaRequest(requestArgs, fullUrl, extract);
+				}else{
+					//este enlace no tiene enlaces hijos
+					//vlog.vlog("Este enlace <",parentUrl,"> --> <",anchorText,"> NO tiene enlaces hijos");
+
+					requesting.lanzaRequest(requestArgs, fullUrl, finish);
+				}
 			}else{
-				//este enlace no tiene enlaces hijos
-				//vlog.vlog("Este enlace <",parentUrl,"> --> <",anchorText,"> NO tiene enlaces hijos");
-				
-				requesting.lanzaRequest(requestArgs, fullUrl, finish);
+				console.log("me salto <",anchorText,"><",anchorHref,"> porque elementsToInspect<",options.elementsToInspect,"> existe y no lo contiene");
+				root.linksPendientes --;
 			}
 		});
 	}
