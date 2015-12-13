@@ -7,75 +7,96 @@ var cheerio			= require('cheerio');
 var requesting		= require('../utils/requesting');
 // -- }
 
-function getItemsList(linksCollection, thisLevel, res, callBack){
-	var fullUrl = linksCollection.mainUrl + thisLevel.url;
+function getItemsList(root, thisLevel, res, callBack){
+	//vlog.vlog();
 	
-	thisLevel.itemsCollection = {
-		mainUrl			: fullUrl,
-		items			: []
-	};
-	
-	var requestArgs = {
-		_callBack			: callBack,
-		_root				: thisLevel.itemsCollection,
-		_response			: res,
-		_linksCollection	: linksCollection,
-		_thisLevel			: thisLevel
-	};
-	
-	linksCollection.linksPendientes++;
-	requesting.lanzaRequest(requestArgs, fullUrl, paginate);
+	if(thisLevel===undefined){
+		thisLevel = root;
+	}
+	if(thisLevel.links !== undefined){
+		for(var key in thisLevel.links){
+			var link = thisLevel.links[key];
+			getItemsList(root, link, res, callBack);
+		}
+	}else{
+		root.linksPendientes++;
+		var fullUrl = root.mainUrl+thisLevel.url;
+		var requestArgs = {
+			_root	: root,
+			_thisLevel			: thisLevel,
+			_response			: res,
+			_callBack			: callBack
+		};
+		requesting.lanzaRequest(requestArgs, fullUrl, paginate);
+	}
 }
 
 function paginate(err, resp, html){
-	var callBack		=	this._callBack;
-	var root			=	this._root;
-	var response		=	this._response;
-	var linksCollection	=	this._linksCollection;
-	var thisLevel		=	this._thisLevel;
+	var thisLevel		= this._thisLevel;
+	var response		= this._response;
+	var callBack		= this._callBack;
+	var root = this._root;
 	
 	if(requesting.checkErrors(err, resp, html, this)===200){
-		linksCollection.linksPendientes--;
+		//vlog.vlog("Visitado el enlace <",this.uri.href,">");
+		root.linksPendientes--;
 		var $ = cheerio.load(html);
-
 		var anchors = getAnchors($);
-		cosa = new Array();
 
 		if(anchors.nextPageLinks.length>0){
-			var nextPageAnchor = anchors.nextPageLinks[0];
-			linksCollection.linksPendientes++;
+			root.linksPendientes++;
+			var nextPageUrl = anchors.nextPageLinks[0].attribs.href;
 			var requestArgs = {
-				_callBack			: callBack,
-				_root				: root,
+				_root	: root,
+				_thisLevel			: thisLevel,
 				_response			: response,
-				_linksCollection	: linksCollection,
-				_thisLevel			: thisLevel
+				_callBack			: callBack
 			};
-			requesting.lanzaRequest(requestArgs, nextPageAnchor.attribs.href, paginate);
+			vlog.vlog("página <",(anchors.nextPageLinks[0].attribs.href.match(/page=[0-9]+/)[0].match(/[0-9]+/)[0]),">");
+			requesting.lanzaRequest(requestArgs, nextPageUrl, paginate);
 		}
-		//Cuento los enlaces de la página actual como pendientes (se irán descontando conforme vaya visitándolos)
-		linksCollection.linksPendientes += anchors.itemsLinks.length;
-		anchors.itemsLinks.each(function(ind, anchor){
+
+		if(anchors.itemsLinks.length>0){
+			thisLevel.items = [];
+			root.linksPendientes+= anchors.itemsLinks.length;
+			anchors.itemsLinks.each(function(ind, itemAnchor){
+				var itemUrl = itemAnchor.attribs.href;
 				var requestArgs = {
-					_callBack			: callBack,
-					_root				: root,
+					_root	: root,
+					_thisLevel			: thisLevel,
 					_response			: response,
-					_linksCollection	: linksCollection,
-					_thisLevel			: thisLevel
+					_callBack			: callBack
 				};
-				requesting.lanzaRequest(requestArgs, root.mainUrl+anchor.attribs.href, getItemInfo);
-		});
-	}else{vlog.vlog("HA HABIDO UN ERROR");}
+				//vlog.vlog("invocando info: <",itemUrl,">");
+				requesting.lanzaRequest(requestArgs, itemUrl, getItemInfo);
+			});
+		}
+
+		//	if(root.linksPendientes === 0){
+		//		vlog.vlog("TERMINADO <",root.linksPendientes,">");
+		//	}else{
+		//		console.log("Aún quedan <",root.linksPendientes,"> enlaces por visitar");
+		//	}
+	}
+}
+
+function getAnchors($){
+	var anchors = {};
+	anchors.nextPageLinks = $("a.next");
+	anchors.itemsLinks = $("a.productLink");
+	
+	return anchors;
 }
 
 function getItemInfo(err, resp, html){
-	var callBack		=	this._callBack;
-	var root			=	this._root;
-	var response		=	this._response;
-	var linksCollection	=	this._linksCollection;
+	var thisLevel		= this._thisLevel;
+	var response		= this._response;
+	var callBack		= this._callBack;
+	var root = this._root;
 	
 	if(requesting.checkErrors(err, resp, html, this)===200){
-		linksCollection.linksPendientes--;
+
+		root.linksPendientes--;
 
 		var item = {};
 
@@ -92,22 +113,15 @@ function getItemInfo(err, resp, html){
 		}
 		item.precio		= parseFloat($("[itemprop='price']").attr("content"));
 
-		root.items.push(item);
 
-		if(linksCollection.linksPendientes === 0){
-			callBack(linksCollection, response);
+		thisLevel.items.push(item);
+
+		if(root.linksPendientes === 0){
+			callBack(root, response);
 		}else{
-			console.log("quedan <",linksCollection.linksPendientes,"> enlaces por visitar");
+			console.log("Aún quedan <",root.linksPendientes,"> enlaces por visitar");
 		}
-	}else{vlog.vlog("HA HABIDO UN ERROR");}
-}
-
-function getAnchors($){
-	var anchors = {};
-	anchors.nextPageLinks = $("a.next");
-	anchors.itemsLinks = $("a.productLink");
-	
-	return anchors;
+	}
 }
 
 module.exports.getItemsList = getItemsList;

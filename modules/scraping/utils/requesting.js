@@ -99,9 +99,9 @@ function relanzaRequest(callerContext){
 			//Descuento el enlace que ha pasado el límite de reintentos.
 			root.linksPendientes --;
 
-//			if(root.linksPendientes===0){
-//				callBack(root);
-//			}
+			if(root.linksPendientes===0){
+				callBack(root);
+			}
 		}
 	}
 }

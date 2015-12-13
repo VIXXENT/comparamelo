@@ -28,31 +28,16 @@ app.get('/scrapeAlternateSelecting', function scrapeAlternate(req, res){
 	alternateLinks.getLinks(url, res, printLink, getLinksOptions);
 });
 
-app.get('/scrapeAlternateItemsList', function scrapeAlternate(req, res){
-	var url = 'https://www.alternate.es/Hardware/Componentes/Memoria-RAM/DDR3/DDR3-1800';
-	alternateItems.getItemsList(url, res, printLink);
-});
-
 app.get('/scrapeAlternateAllItemsLists', function scrapeAlternateAllItemsLists(req, res){
 	var getLinksOptions = {elementsToInspect : [
-		"/Hardware/Componentes/Discos-duros"
+		"/Hardware/Componentes"
 	]};
 	alternateLinks.getLinks('https://www.alternate.es', res, printLinksCollection, getLinksOptions);
 });
 
 function printLinksCollection(linksCollection, response, thisLevel){
 	linksCollection.linksPendientes = 0;
-	if(thisLevel===undefined){
-		thisLevel = linksCollection;
-	}
-	
-	if(thisLevel.links !== undefined){
-		for(var key in thisLevel.links){
-			printLinksCollection(linksCollection, response, thisLevel.links[key]);
-		}
-	}else{
-		alternateItems.getItemsList(linksCollection, thisLevel, response, printLink);
-	}
+	alternateItems.getItemsList(linksCollection, thisLevel, response, printLink);
 }
 
 function printLink(link, response){
