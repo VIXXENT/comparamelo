@@ -63,16 +63,38 @@ function lanzaRequest(requestArgs, url, callBack) {
 function extract(err, resp, html){
                         
     console.log(this.uri.href);
+    var root		= this._root;
+    var thisLevel	= this._thisLevel;
+    var callBack        = this._callBack;
+    var response        = this._response;
     
+    if(thisLevel === undefined){
+	thisLevel = root;
+    }
+        
     if(checkErrors(err, resp, html, this)===200){
         var $ = cheerio.load(html);
         links = $(".cargaSubMenu");
 
         links.each(function eachLinks(ind, link){
+            
+            var anchorText = $(link).text();
+            var anchorHref = $(link).children("a").attr("href");
+            console.log('*******');
+            console.log(anchorText, anchorHref);
+            
+            thisLevel[anchorText] = {url:anchorHref};
+            
             var linkId = $(link).attr("id");
             var opcion = linkId.replace("btn_menu_","");
+            
+            var requestArgs = {
+		_callBack	: callBack,
+		_root		: root,
+		_response	: response
+            };
 
-            lanzaRequest({}, "http://www.pccomponentes.com/nuevo_menu/inc_menu_dinamico.php?opcion="+opcion, scrape);
+            lanzaRequest(requestArgs, "http://www.pccomponentes.com/nuevo_menu/inc_menu_dinamico.php?opcion="+opcion, scrape);
 
         });
     }
@@ -85,7 +107,7 @@ function scrape(err, resp, html){
     var contenido = $(html);
     var secciones = contenido.find('#id_destacados_secciones');
     var seccionesA = secciones.find('a');
-											
+    
     seccionesA.each(function(ind, elemento){
         console.log(elemento.attribs.href);
     });
