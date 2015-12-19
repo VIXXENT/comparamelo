@@ -30,7 +30,7 @@ app.get('/scrapeAlternateSelecting', function scrapeAlternate(req, res){
 
 app.get('/scrapeAlternateAllItemsLists', function scrapeAlternateAllItemsLists(req, res){
 	var getLinksOptions = {elementsToInspect : [
-		"/Hardware/Componentes"
+		"/Hardware/Componentes/Refrigeración/"
 	]};
 	alternateLinks.getLinks('https://www.alternate.es', res, printLinksCollection, getLinksOptions);
 });
