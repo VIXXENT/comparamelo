@@ -57,58 +57,86 @@ function lanzaRequest(requestArgs, url, callBack) {
 
 function extract(err, resp, html){
                         
-    console.log(this.uri.href);
     var thisLevel = this._thisLevel;
+    var callBack = this._callBack;
+    var parentUrl = this._url;
+    var root = this._root;
+    var response = this._response;
         
     if(checkErrors(err, resp, html, this)===200){
         var $ = cheerio.load(html);
-        links = $(".cargaSubMenu");
+        
+        //Descuento el enlace que ha ido bien.
+	root.linksPendientes --;    
+		
+	var parentPath = parentUrl.replace(root.mainUrl,'');
+	var anchors = getAnchors(parentPath, $);
+	root.linksPendientes += anchors.length;
 
-        links.each(function eachLinks(ind, link){
+        anchors.each(function eachLinks(ind, anchor){
             
-            var anchorText = $(link).text();
-            var anchorHref = $(link).children("a").attr("href");
-            console.log('*******');
-            console.log(anchorText, anchorHref);
-            
+            var anchorText = $(anchor).text();
+            var anchorHref = $(anchor).children("a").attr("href");        
             
             var requestArgs = {
-                _callBack : this._callBack
+                _callBack : callBack,
+                _root : root,
+                _response : response
             };
             
             thisLevel[anchorText] = {url:anchorHref};
+                    
+            if($(anchor).closest("div").hasClass("menu-principal")){    // Estamos en el primer nivel
+                thisLevel[anchorText].links = {};
+                requestArgs._thisLevel = thisLevel[anchorText].links;  
             
-            thisLevel[anchorText].links = {};
-            requestArgs._thisLevel = thisLevel[anchorText].links;  
+                var linkId = $(anchor).attr("id");
+                var opcion = linkId.replace("btn_menu_","");
+      
+                lanzaRequest(requestArgs, "http://www.pccomponentes.com/nuevo_menu/inc_menu_dinamico.php?opcion="+opcion, extract);
+            }else{  // Segundo nivel TO-DO: identificar este nivel con un selector
+                thisLevel[anchorText] = {url: anchorHref};
+            }
             
-            var linkId = $(link).attr("id");
-            var opcion = linkId.replace("btn_menu_","");
-            
- 
-            lanzaRequest(requestArgs, "http://www.pccomponentes.com/nuevo_menu/inc_menu_dinamico.php?opcion="+opcion, scrape);
-
         });
     }
 	
 }
 
-function scrape(err, resp, html){
+function getAnchors(parentPath, $){
     
-    var thisLevel = this._thisLevel;
+    console.log("Obteniendo sub-enlaces de <",parentPath,">");
+    var anchors = undefined;
+    var childrenselector = undefined;
     
-    var $ = cheerio.load(html);
-    var contenido = $(html);
-    var secciones = contenido.find('#id_destacados_secciones');
-    var seccionesA = secciones.find('a');
+    if(parentPath===undefined || parentPath===null || parentPath==='/' || parentPath===''){
+        childrenselector = ".cargaSubMenu";
+	anchors = $(childrenselector);
+    }else{
+        childrenselector = "#id_destacados_secciones";
+        anchors = $(childrenselector).find('a');   
+    }
     
-    seccionesA.each(function(ind, elemento){
-        var anchorHref = $(elemento).attr("href");
-        var anchorText = $(elemento).text();
-        
-        thisLevel[anchorText] = {url: anchorHref};
-    });
-    			
+    return anchors;
+    
 }
+//function scrape(err, resp, html){
+//    
+//    var thisLevel = this._thisLevel;
+//    
+//    var $ = cheerio.load(html);
+//    var contenido = $(html);
+//    var secciones = contenido.find('#id_destacados_secciones');
+//    var seccionesA = secciones.find('a');
+//    
+//    seccionesA.each(function(ind, elemento){
+//        var anchorHref = $(elemento).attr("href");
+//        var anchorText = $(elemento).text();
+//        
+//        thisLevel[anchorText] = {url: anchorHref};
+//    });
+//    			
+//}
 
 
 function checkErrors(err, resp, html, callerContext){
