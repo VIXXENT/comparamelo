@@ -76,7 +76,7 @@ function extract(err, resp, html){
         anchors.each(function eachLinks(ind, anchor){
             
             var anchorText = $(anchor).text();
-            var anchorHref = $(anchor).children("a").attr("href");        
+            var anchorHref = $(anchor).attr("href");        
             
             var requestArgs = {
                 _callBack : callBack,
@@ -84,18 +84,30 @@ function extract(err, resp, html){
                 _response : response
             };
             
-            thisLevel[anchorText] = {url:anchorHref};
-                    
             if($(anchor).closest("div").hasClass("menu-principal")){    // Estamos en el primer nivel
+                
+                thisLevel[anchorText] = {url:anchorHref};
                 thisLevel[anchorText].links = {};
                 requestArgs._thisLevel = thisLevel[anchorText].links;  
             
-                var linkId = $(anchor).attr("id");
+                var linkId = $(anchor).closest("li").attr("id");
                 var opcion = linkId.replace("btn_menu_","");
       
                 lanzaRequest(requestArgs, "http://www.pccomponentes.com/nuevo_menu/inc_menu_dinamico.php?opcion="+opcion, extract);
+            
             }else{  // Segundo nivel TO-DO: identificar este nivel con un selector
-                thisLevel[anchorText] = {url: anchorHref};
+                
+                root.linksPendientes --;
+                
+                if(anchorHref !== "#"){ // Evitamos almacenar los títulos. Simplemente descontamos el item para que siga la ejecución.
+                    thisLevel[anchorText] = {url:anchorHref};
+                }
+                
+                if(root.linksPendientes === 0){
+                    callBack(root, response);
+                }else{
+                    console.log("quedan <"+root.linksPendientes+"> enlaces por visitar");
+                }
             }
             
         });
@@ -110,7 +122,7 @@ function getAnchors(parentPath, $){
     var childrenselector = undefined;
     
     if(parentPath===undefined || parentPath===null || parentPath==='/' || parentPath===''){
-        childrenselector = ".cargaSubMenu";
+        childrenselector = ".cargaSubMenu a";
 	anchors = $(childrenselector);
     }else{
         childrenselector = "#id_destacados_secciones";
@@ -120,24 +132,6 @@ function getAnchors(parentPath, $){
     return anchors;
     
 }
-//function scrape(err, resp, html){
-//    
-//    var thisLevel = this._thisLevel;
-//    
-//    var $ = cheerio.load(html);
-//    var contenido = $(html);
-//    var secciones = contenido.find('#id_destacados_secciones');
-//    var seccionesA = secciones.find('a');
-//    
-//    seccionesA.each(function(ind, elemento){
-//        var anchorHref = $(elemento).attr("href");
-//        var anchorText = $(elemento).text();
-//        
-//        thisLevel[anchorText] = {url: anchorHref};
-//    });
-//    			
-//}
-
 
 function checkErrors(err, resp, html, callerContext){
 	
