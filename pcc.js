@@ -66,7 +66,7 @@ function extract(err, resp, html){
     if(checkErrors(err, resp, html, this)===200){
         var $ = cheerio.load(html);
         
-        //Descuento el enlace que ha ido bien.
+        // Descuento el enlace que ha ido bien.
 	root.linksPendientes --;    
 		
 	var parentPath = parentUrl.replace(root.mainUrl,'');
@@ -95,7 +95,7 @@ function extract(err, resp, html){
       
                 lanzaRequest(requestArgs, "http://www.pccomponentes.com/nuevo_menu/inc_menu_dinamico.php?opcion="+opcion, extract);
             
-            }else{  // Segundo nivel TO-DO: identificar este nivel con un selector
+            }else if($(anchor).closest("div").hasClass("elementoMenusubfamilia")){  // Segundo nivel 
                 
                 root.linksPendientes --;
                 
@@ -125,7 +125,7 @@ function getAnchors(parentPath, $){
         childrenselector = ".cargaSubMenu a";
 	anchors = $(childrenselector);
     }else{
-        childrenselector = "#id_destacados_secciones";
+        childrenselector = ".enlacesSubmenusSubfamilias";
         anchors = $(childrenselector).find('a');   
     }
     
