@@ -43,17 +43,12 @@ function lanzaRequest(requestArgs, url, callBack) {
                     "user-agent": "Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/44.0.2403.107 Safari/537.36"
                 },
 	uri                     : encodedUri,
-	_url                    : url,
-	_bkpRequest:{
-                    requestArgs	:requestArgs,
-                    url		:encodedUri,
-                    callBack	:callBack
-                }
-	};
+	_url                    : url
+    };
 	
-	for(var key in requestArgs){
-		requestArguments[key] = requestArgs[key];
-	}
+    for(var key in requestArgs){
+	requestArguments[key] = requestArgs[key];
+    }
 	
 	request(requestArguments, callBack);
 };
@@ -62,58 +57,81 @@ function lanzaRequest(requestArgs, url, callBack) {
 
 function extract(err, resp, html){
                         
-    console.log(this.uri.href);
-    var root		= this._root;
-    var thisLevel	= this._thisLevel;
-    var callBack        = this._callBack;
-    var response        = this._response;
-    
-    if(thisLevel === undefined){
-	thisLevel = root;
-    }
+    var thisLevel = this._thisLevel;
+    var callBack = this._callBack;
+    var parentUrl = this._url;
+    var root = this._root;
+    var response = this._response;
         
     if(checkErrors(err, resp, html, this)===200){
         var $ = cheerio.load(html);
-        links = $(".cargaSubMenu");
+        
+        // Descuento el enlace que ha ido bien.
+	root.linksPendientes --;    
+		
+	var parentPath = parentUrl.replace(root.mainUrl,'');
+	var anchors = getAnchors(parentPath, $);
+	root.linksPendientes += anchors.length;
 
-        links.each(function eachLinks(ind, link){
+        anchors.each(function eachLinks(ind, anchor){
             
-            var anchorText = $(link).text();
-            var anchorHref = $(link).children("a").attr("href");
-            console.log('*******');
-            console.log(anchorText, anchorHref);
-            
-            thisLevel[anchorText] = {url:anchorHref};
-            
-            var linkId = $(link).attr("id");
-            var opcion = linkId.replace("btn_menu_","");
+            var anchorText = $(anchor).text();
+            var anchorHref = $(anchor).attr("href");        
             
             var requestArgs = {
-		_callBack	: callBack,
-		_root		: root,
-		_response	: response
+                _callBack : callBack,
+                _root : root,
+                _response : response
             };
-
-            lanzaRequest(requestArgs, "http://www.pccomponentes.com/nuevo_menu/inc_menu_dinamico.php?opcion="+opcion, scrape);
-
+            
+            if($(anchor).closest("div").hasClass("menu-principal")){    // Estamos en el primer nivel
+                
+                thisLevel[anchorText] = {url:anchorHref};
+                thisLevel[anchorText].links = {};
+                requestArgs._thisLevel = thisLevel[anchorText].links;  
+            
+                var linkId = $(anchor).closest("li").attr("id");
+                var opcion = linkId.replace("btn_menu_","");
+      
+                lanzaRequest(requestArgs, "http://www.pccomponentes.com/nuevo_menu/inc_menu_dinamico.php?opcion="+opcion, extract);
+            
+            }else if($(anchor).closest("div").hasClass("elementoMenusubfamilia")){  // Segundo nivel 
+                
+                root.linksPendientes --;
+                
+                if(anchorHref !== "#"){ // Evitamos almacenar los títulos. Simplemente descontamos el item para que siga la ejecución.
+                    thisLevel[anchorText] = {url:anchorHref};
+                }
+                
+                if(root.linksPendientes === 0){
+                    callBack(root, response);
+                }else{
+                    console.log("quedan <"+root.linksPendientes+"> enlaces por visitar");
+                }
+            }
+            
         });
     }
 	
 }
 
-function scrape(err, resp, html){
+function getAnchors(parentPath, $){
     
-    var $ = cheerio.load(html);
-    var contenido = $(html);
-    var secciones = contenido.find('#id_destacados_secciones');
-    var seccionesA = secciones.find('a');
+    console.log("Obteniendo sub-enlaces de <",parentPath,">");
+    var anchors = undefined;
+    var childrenselector = undefined;
     
-    seccionesA.each(function(ind, elemento){
-        console.log(elemento.attribs.href);
-    });
-			
+    if(parentPath===undefined || parentPath===null || parentPath==='/' || parentPath===''){
+        childrenselector = ".cargaSubMenu a";
+	anchors = $(childrenselector);
+    }else{
+        childrenselector = ".enlacesSubmenusSubfamilias";
+        anchors = $(childrenselector).find('a');   
+    }
+    
+    return anchors;
+    
 }
-
 
 function checkErrors(err, resp, html, callerContext){
 	
