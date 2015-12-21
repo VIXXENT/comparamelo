@@ -2,9 +2,13 @@
 var vlog			= require('vlog');
 var mongoose		= require('mongoose');
 // -- }
+// 
+// -- LOCAL MODULES {
+var Articulo	= require('../Models/articulo');
+// -- }
 
 function initializeArticulo(initObj){
-	var Articulo = mongoose.model('Articulo');
+	//var Articulo = mongoose.model('Articulo');
 	var articulo = new Articulo();
 	
 	for(var key in articulo){
@@ -13,7 +17,10 @@ function initializeArticulo(initObj){
 			articulo[key] = value;
 		}
 	}
+	return articulo;
 }
+
+module.exports.newarticulo = initializeArticulo;
 
 //Idea para cuando maneje mongoose ¿un inicializador de cualquier model en base a las propiedades
 //del objeto que se reciba por parámetro?

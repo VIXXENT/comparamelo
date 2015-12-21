@@ -107,6 +107,7 @@ function getItemInfo(err, resp, html){
 		item.fullName	= productNameParts.text().trim();
 		item.marca		= productNameParts.find("span[itemprop=brand]").text();
 		item.modelo		= productNameParts.find("span:not(span[itemprop=brand]):not(.productNameSub)").text();
+		item.pagina		= root.mainUrl;
 		var subModelo	= productNameParts.find("span.productNameSub").text();
 		if(subModelo!==undefined && subModelo.length>0){
 			item.subModelo = subModelo;
