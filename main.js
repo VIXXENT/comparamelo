@@ -91,7 +91,7 @@ function saveArticulos(articulos){
 				if(error){
 					vlog.vlog("ERROR - ",error);
 				}else{
-					vlog.vlog("TODO CORRECTO");
+					vlog.vlog("GUARDADO OK (?)");
 				}
 			});
 		});
