@@ -11,7 +11,7 @@ var chromeHeaders = {
 };
 
 app.get('/scrapePCC', function scrapePCC(req, res){
-    var url = 'http://www.pccomponentes.com/';
+    var url = 'http://www.pccomponentes.com';
     getLinks(url, res);
 });
 
@@ -54,65 +54,64 @@ function lanzaRequest(requestArgs, url, callBack) {
 };
 
 
+function extract(err, resp, html) {
 
-function extract(err, resp, html){
-                        
     var thisLevel = this._thisLevel;
     var callBack = this._callBack;
     var parentUrl = this._url;
     var root = this._root;
     var response = this._response;
-        
-    if(checkErrors(err, resp, html, this)===200){
-        var $ = cheerio.load(html);
-        
-        // Descuento el enlace que ha ido bien.
-	root.linksPendientes --;    
-		
-	var parentPath = parentUrl.replace(root.mainUrl,'');
-	var anchors = getAnchors(parentPath, $);
-	root.linksPendientes += anchors.length;
 
-        anchors.each(function eachLinks(ind, anchor){
-            
-            var anchorText = $(anchor).text();
-            var anchorHref = $(anchor).attr("href");        
-            
-            var requestArgs = {
-                _callBack : callBack,
-                _root : root,
-                _response : response
-            };
-            
-            if($(anchor).closest("div").hasClass("menu-principal")){    // Estamos en el primer nivel
-                
-                thisLevel[anchorText] = {url:anchorHref};
-                thisLevel[anchorText].links = {};
-                requestArgs._thisLevel = thisLevel[anchorText].links;  
-            
-                var linkId = $(anchor).closest("li").attr("id");
-                var opcion = linkId.replace("btn_menu_","");
-      
-                lanzaRequest(requestArgs, "http://www.pccomponentes.com/nuevo_menu/inc_menu_dinamico.php?opcion="+opcion, extract);
-            
-            }else if($(anchor).closest("div").hasClass("elementoMenusubfamilia")){  // Segundo nivel 
-                
-                root.linksPendientes --;
-                
-                if(anchorHref !== "#"){ // Evitamos almacenar los títulos. Simplemente descontamos el item para que siga la ejecución.
-                    thisLevel[anchorText] = {url:anchorHref};
-                }
-                
-                if(root.linksPendientes === 0){
-                    callBack(root, response);
-                }else{
-                    console.log("quedan <"+root.linksPendientes+"> enlaces por visitar");
-                }
+    if (checkErrors(err, resp, html, this) === 200) {
+
+        var $ = cheerio.load(html);
+
+        root.linksPendientes--;
+
+
+        if ($("[name='filtro']").length > 0) {
+            finish.apply(this, arguments);
+        } else {
+
+            if ($("*:contains('No encontrados artículos en')").length === 0) {
+                var parentPath = parentUrl.replace(root.mainUrl, '');
+                var anchors = getAnchors(parentPath, $);
+                root.linksPendientes += anchors.length;
+                anchors.each(function eachLinks(ind, anchor) {
+
+                    //console.log(root.linksPendientes, anchor);
+                    var anchorText = $(anchor).text();
+                    var anchorHref = $(anchor).attr("href");
+
+                    var requestArgs = {
+                        _callBack: callBack,
+                        _root: root,
+                        _response: response
+                    };
+
+                    thisLevel[anchorText] = {url: anchorHref};
+
+                    //fun.apply(thisArg[, argsArray])
+
+                    //if($(anchor).closest("div").hasClass("menu-principal")){ //|| !($(anchor).closest("div").siblings("form").attr("name") === "filtro")){    // Tiene hijos  
+                    thisLevel[anchorText].links = {};
+                    requestArgs._thisLevel = thisLevel[anchorText].links;
+                    console.log(anchorHref, "Visitando");
+                    lanzaRequest(requestArgs, anchorHref, extract);
+                    //}
+
+
+
+                    //            }else{ // No tiene hijos
+                    //                console.log(parentUrl, anchorHref," no tiene hijos");
+                    //                lanzaRequest(requestArgs, anchorHref, finish);
+                    //            }
+
+                });
             }
-            
-        });
+
+        }
     }
-	
 }
 
 function getAnchors(parentPath, $){
@@ -122,15 +121,28 @@ function getAnchors(parentPath, $){
     var childrenselector = undefined;
     
     if(parentPath===undefined || parentPath===null || parentPath==='/' || parentPath===''){
-        childrenselector = ".cargaSubMenu a";
+        //childrenselector = ".cargaSubMenu a:not(:contains('Home')";
+        childrenselector = ".cargaSubMenu a:contains('Zona Gadget')";
 	anchors = $(childrenselector);
     }else{
-        childrenselector = ".enlacesSubmenusSubfamilias";
-        anchors = $(childrenselector).find('a');   
+        childrenselector = ".menu-familias a:not(:contains('Configurador')";
+        anchors = $(childrenselector);   
     }
     
     return anchors;
     
+}
+
+function finish(err, resp, html){
+        var root		= this._root;
+	var callBack	= this._callBack;
+	var response	= this._response;
+	
+	if(root.linksPendientes === 0){
+		callBack(root, response);
+	}else{
+		console.log("quedan <"+root.linksPendientes+"> enlaces por visitar");
+	}
 }
 
 function checkErrors(err, resp, html, callerContext){
