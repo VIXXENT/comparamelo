@@ -85,7 +85,8 @@ function extract(err, resp, html){
             };
             
             if($(anchor).closest("div").hasClass("menu-principal")){    // Estamos en el primer nivel
-                
+                console.log("PRIMER NIVEL");
+				
                 thisLevel[anchorText] = {url:anchorHref};
                 thisLevel[anchorText].links = {};
                 requestArgs._thisLevel = thisLevel[anchorText].links;  
@@ -95,23 +96,24 @@ function extract(err, resp, html){
       
                 lanzaRequest(requestArgs, "http://www.pccomponentes.com/nuevo_menu/inc_menu_dinamico.php?opcion="+opcion, extract);
             
-            }else if($(anchor).closest("div").hasClass("elementoMenusubfamilia")){  // Segundo nivel 
-                
-                root.linksPendientes --;
-                
-                if(anchorHref !== "#"){ // Evitamos almacenar los títulos. Simplemente descontamos el item para que siga la ejecución.
-                    thisLevel[anchorText] = {url:anchorHref};
-                }
-                
-                if(root.linksPendientes === 0){
-                    callBack(root, response);
-                }else{
-                    console.log("quedan <"+root.linksPendientes+"> enlaces por visitar");
-                }
-            }
+            }else {  // Segundo nivel 
+				console.log("SEGUNDO NIVEL");
+				root.linksPendientes --;  
+				if(anchorHref !== "#"){ // Evitamos almacenar los títulos. Simplemente descontamos el item para que siga la ejecución.
+					thisLevel[anchorText] = {url:anchorHref};
+				}
+
+				if(root.linksPendientes === 0){
+					callBack(root, response);
+				}else{
+					console.log("quedan <"+root.linksPendientes+"> enlaces por visitar");
+				}
+			}
             
         });
-    }
+    }else{
+		console.log("Página saltada");
+	}
 	
 }
 

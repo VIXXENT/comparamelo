@@ -20,7 +20,30 @@ function initializeArticulo(initObj){
 	return articulo;
 }
 
-module.exports.newarticulo = initializeArticulo;
+/**
+ * Método que obtiene las diferentes marcas a las que pertenecen los artículos registrados en BD
+ * Si recibe un callback, lo invoca con los resultados que obtiene de la consulta.
+ * Retorna los resultados por si se quiere usar de forma síncriona.
+ * 
+ * @param {function} callBack
+ * @returns {Array[String]} results
+ */
+function getDistinctBrands(callBack){
+	Articulo.distinct('marca', function(err, results){
+		if(err){
+			vlog.vlog("ERROR - ",err);
+		}else{
+			vlog.vlog("Consulta OK, resultados: \n",results);
+			if(callBack){
+				callBack(results);
+			}
+			return results;
+		}
+	});
+}
+
+module.exports.newarticulo			= initializeArticulo;
+module.exports.getDistinctBrands	= getDistinctBrands;
 
 //Idea para cuando maneje mongoose ¿un inicializador de cualquier model en base a las propiedades
 //del objeto que se reciba por parámetro?

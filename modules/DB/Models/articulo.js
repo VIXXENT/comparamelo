@@ -4,7 +4,7 @@ var Schema = mongoose.Schema;
 var articuloSchema = new Schema({
 	precio:{
 		type: Number,
-		required: "No se ha informadoel precio del artículo."
+		required: "No se ha informado el precio del artículo."
 	},
 	marca:{
 		type: String,
