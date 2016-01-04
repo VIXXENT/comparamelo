@@ -9,6 +9,15 @@ var massiveInsertCheck	= require('./basicCheckers/massiveInsertCheck');
 // -- }
 
 
+/**
+ * This method recieves a colection of elements instantiated from a Mongoose model, and bulk-inserts them into BD.
+ * Bulk insert is notably quicker than a insert loop.
+ * <br/>--<br/>
+ * Método que recibe una colección de elementos instanciados a partir de un modelo de Mongoose y realiza un bulk insert
+ * en BD de todos ellos. Bulk insert es notablemente más rápido que un bucle de inserts.
+ * @param {type} collection
+ * @returns {undefined}
+ */
 function bulkInsert(collection){
 	if((!collection.length) || collection.length<=0){
 		throw new Error("invalid collection.length = <",collection.length,">");

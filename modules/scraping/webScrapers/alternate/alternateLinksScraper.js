@@ -4,7 +4,7 @@ var cheerio			= require('cheerio');
 // -- }
 
 // -- LOCAL MODULES {
-var requesting		= require('../utils/requesting');
+var requesting		= require('../../utils/requesting');
 // -- }
 
 function getLinks(url, res, callBack, options){
@@ -24,7 +24,6 @@ function getLinks(url, res, callBack, options){
 		_callBack	: callBack,
 		_root		: aLinks,
 		_thisLevel	: aLinks.links,
-		_response	: res,
 		_options	: options
 	};
 	requesting.lanzaRequest(requestArgs, url, extract);
@@ -35,7 +34,6 @@ function extract(err, resp, html){
 	var root		= this._root;
 	var thisLevel	= this._thisLevel;
 	var callBack	= this._callBack;
-	var response	= this._response;
 	var options		= this._options;
 	
 	if(thisLevel === undefined){
@@ -71,7 +69,6 @@ function extract(err, resp, html){
 				var requestArgs = {
 					_callBack	: callBack,
 					_root		: root,
-					_response	: response,
 					_options	: options
 				};
 
@@ -99,17 +96,14 @@ function extract(err, resp, html){
 }
 
 function finish(err, resp, html){
-	//vlog.vlog();
-	//var parentUrl	= this._url;
 	var root		= this._root;
 	var callBack	= this._callBack;
-	var response	= this._response;
-	//var $			= cheerio.load(html);
+	var options		= this._options;
 	
 	root.linksPendientes --;
 	
 	if(root.linksPendientes === 0){
-		callBack(root, response);
+		callBack(root, options);
 	}else{
 		console.log("quedan <"+root.linksPendientes+"> enlaces por visitar");
 	}

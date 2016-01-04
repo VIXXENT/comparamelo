@@ -4,8 +4,16 @@ var cheerio			= require('cheerio');
 // -- }
 
 // -- LOCAL MODULES {
-var requesting		= require('../utils/requesting');
+var requesting		= require('../../utils/requesting');
 // -- }
+
+function saveItems(linksCollection, options){
+	linksCollection.linksPendientes = 0;
+	var response = options.response;
+	var callBack = options.itemsCallBack;
+	
+	getItemsList(linksCollection, undefined, response, callBack);
+}
 
 function getItemsList(root, thisLevel, res, callBack){
 	//vlog.vlog();
@@ -126,3 +134,4 @@ function getItemInfo(err, resp, html){
 }
 
 module.exports.getItemsList = getItemsList;
+module.exports.saveItems = saveItems;

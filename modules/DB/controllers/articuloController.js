@@ -5,6 +5,7 @@ var mongoose		= require('mongoose');
 // 
 // -- LOCAL MODULES {
 var Articulo	= require('../Models/articulo');
+var saveCheck	= require('../basicCheckers/saveCheck');
 // -- }
 
 function initializeArticulo(initObj){
@@ -18,6 +19,20 @@ function initializeArticulo(initObj){
 		}
 	}
 	return articulo;
+}
+
+function saveArticulos(articulos){//TODO: hay que cambiar el guardado individual a un bulk save --> http://andysandefer.com/wordpress/?p=30
+	var links = articulos.links;
+	if(links !== undefined){
+		for(var key in links){
+			saveArticulos(links[key]);
+		}
+	}else if (articulos.items){
+		articulos.items.forEach(function eacharticulo(articulo){
+			var articulo = initializeArticulo(articulo);
+			articulo.save(saveCheck);
+		});
+	}
 }
 
 /**
@@ -42,8 +57,9 @@ function getDistinctBrands(callBack){
 	});
 }
 
-module.exports.newarticulo			= initializeArticulo;
+module.exports.initializeArticulo	= initializeArticulo;
 module.exports.getDistinctBrands	= getDistinctBrands;
+module.exports.saveArticulos		= saveArticulos;
 
 //Idea para cuando maneje mongoose ¿un inicializador de cualquier model en base a las propiedades
 //del objeto que se reciba por parámetro?
