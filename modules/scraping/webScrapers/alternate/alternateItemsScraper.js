@@ -113,16 +113,17 @@ function getItemInfo(err, resp, html){
 		var productNameParts = $(".productNameContainer");
 
 		item.fullName	= productNameParts.text().trim();
-		item.marca		= productNameParts.find("span[itemprop=brand]").text();
-		item.modelo		= productNameParts.find("span:not(span[itemprop=brand]):not(.productNameSub)").text();
-		item.pagina		= root.mainUrl;
-		var subModelo	= productNameParts.find("span.productNameSub").text();
-		if(subModelo!==undefined && subModelo.length>0){
-			item.subModelo = subModelo;
+		item.brand		= productNameParts.find("span[itemprop=brand]").text();
+		item.model		= productNameParts.find("span:not(span[itemprop=brand]):not(.productNameSub)").text();
+		item.webPage	= root.mainUrl;
+		var subModel	= productNameParts.find("span.productNameSub").text();
+		if(subModel!==undefined && subModel.length>0){
+			item.subModel = subModel;
 		}
-		item.precio		= parseFloat($("[itemprop='price']").attr("content"));
-
-
+		item.price		= parseFloat($("[itemprop='price']").attr("content"));
+		
+		extractData($, item);
+		
 		thisLevel.items.push(item);
 
 		if(root.linksPendientes === 0){
@@ -133,5 +134,33 @@ function getItemInfo(err, resp, html){
 	}
 }
 
-module.exports.getItemsList = getItemsList;
-module.exports.saveItems = saveItems;
+function extractData($, item){
+	var dataTable = $("#coreProductInfos");
+	item.specifications = {};
+	var mainTitles = dataTable.find(".techDataCol1");
+	
+	mainTitles.each(function(ind, mainTitle){
+		mainTitle = $(mainTitle);
+		var propertyKey = mainTitle.text();
+		var propertyValue = $(mainTitle.siblings()[0]).text();//TODO: obviamente esto no puede quedarse así. Hay que convertir estos valores en objetos complejos
+		
+		item.specifications[propertyKey] = propertyValue;
+	});
+}
+
+function scrapeOneItem(itemUrl, response, callBack){
+	var root = {linksPendientes:1, items:[]};
+	var requestArgs = {
+		_root				: root,
+		_thisLevel			: root,
+		_response			: response,
+		_callBack			: callBack
+	};
+	
+	vlog.vlog("invocando info: <",itemUrl,">");
+	requesting.lanzaRequest(requestArgs, itemUrl, getItemInfo);
+}
+
+module.exports.getItemsList		= getItemsList;
+module.exports.saveItems		= saveItems;
+module.exports.scrapeOneItem	= scrapeOneItem;

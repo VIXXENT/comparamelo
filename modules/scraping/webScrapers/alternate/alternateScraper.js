@@ -43,4 +43,9 @@ function scrapeAlternate(options){
 	
 }
 
+function scrapeOneItem(url, response, callback){
+	itemsScraper.scrapeOneItem(url, response, callback);
+}
+
 module.exports.scrape = scrapeAlternate;
+module.exports.scrapeOneItem = scrapeOneItem;
